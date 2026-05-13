@@ -16,7 +16,7 @@ insert into public.itinerary_stops (stop_date, location_no, type, notes_no, posi
   ('2026-07-01', 'Tjøme / Verdens Ende',      'anchorage', 'Ankring i ly bak en holme. Bading.',                             4),
   ('2026-07-02', 'Stavern',                   'harbor',    'Sjarmerende sørlandsby. Restaurant på land.',                    5),
   ('2026-07-03', 'Nevlunghavn',               'anchorage', 'Ankring i Mølen-området hvis vær tillater.',                     6),
-  ('2026-07-04', 'Kragerø',                   'harbor',    'Skjærgårdsperle. Lengre etappe — start tidlig.',                7),
+  ('2026-07-04', 'Kragerø',                   'harbor',    'Skjærgårdsperle. Lengre etappe, start tidlig.',                  7),
   ('2026-07-05', 'Risør',                     'harbor',    'Hvite hus, trebåtfestivalstemning.',                             8),
   ('2026-07-06', 'Lyngør',                    'anchorage', 'Ankring i sundet. Stille kveld.',                                9),
   ('2026-07-07', 'Lillesand',                 'harbor',    'Snuvendepunkt. Bytte av mannskap mulig her.',                   10),

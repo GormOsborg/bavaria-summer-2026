@@ -23,7 +23,7 @@ update public.itinerary_stops set lat = 58.9400, lng = 11.1790 where stop_date =
 update public.itinerary_stops set lat = 58.6020, lng = 11.2860 where stop_date = '2026-07-14';
 update public.itinerary_stops set lat = 58.9400, lng = 11.1790 where stop_date = '2026-07-15';
 
--- Skipperens faste plass i forlugaren hele reisen. Idempotent — kjør gjerne flere ganger.
+-- Skipperens faste plass i forlugaren hele reisen. Idempotent, kjør gjerne flere ganger.
 insert into public.bookings (guest_name, cabin_id, start_date, end_date, notes)
 select 'Skipper', 'forward', '2026-06-28', '2026-07-15', 'Skipper hele reisen'
 where not exists (

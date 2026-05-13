@@ -13,10 +13,10 @@ const SPECS: Array<{ label: string; value: string }> = [
 ];
 
 const PACKING = [
-  "Sovepose eller laken",
-  "Klær for både sol og kuling — Nordsjøen kan være lunefull",
+  "Sovepose, laken og pute",
+  "Klær for både sol og kuling. Nordsjøen kan være lunefull",
   "Solbriller, solkrem, lue",
-  "Et par sko du kan ha våte (gjerne lyse såler — ikke svarte striper på dekk)",
+  "Et par sko du kan ha våte (gjerne lyse såler, ikke svarte striper på dekk)",
   "Toalettmappe",
 ];
 

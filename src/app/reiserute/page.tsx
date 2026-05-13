@@ -40,7 +40,7 @@ export default async function ReiserutePage() {
       <header>
         <h1 className="text-3xl font-semibold tracking-tight">Reiserute</h1>
         <p className="mt-2 text-foreground/70 max-w-2xl">
-          Dette er en skisse — vær, vind og lyst styrer hva som faktisk skjer.
+          Dette er en skisse. Vær, vind og lyst styrer hva som faktisk skjer.
           Hver linje viser hvor vi planlegger å sove natten til den datoen.
         </p>
       </header>

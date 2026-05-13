@@ -6,7 +6,7 @@ reiseruten, se båten, og bestille lugar for de dagene de vil være med.
 
 - **Stack:** Next.js 16 (App Router) + TypeScript + Tailwind v4
 - **Backend:** Supabase (Postgres)
-- **Auth:** Delt passord — én streng som alle vennene får i gruppechatten
+- **Auth:** Delt passord, én streng som alle vennene får i gruppechatten
 - **Deploy:** Vercel
 
 ## Førstegangsoppsett
@@ -22,7 +22,7 @@ reiseruten, se båten, og bestille lugar for de dagene de vil være med.
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` `secret` key → `SUPABASE_SERVICE_ROLE_KEY`
 
-> Service-role-nøkkelen omgår RLS. Den må aldri eksponeres til klienten — den
+> Service-role-nøkkelen omgår RLS. Den må aldri eksponeres til klienten, den
 > brukes kun fra server actions.
 
 ### 2. Lokalt

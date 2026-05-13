@@ -271,7 +271,7 @@ export default function BoatSvg({
           </>
         ) : (
           <p className="text-foreground/60">
-            Hold musen over en lugar — eller trykk på den — for å lese mer.
+            Hold musen over en lugar, eller trykk på den, for å lese mer.
           </p>
         )}
       </aside>
