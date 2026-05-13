@@ -41,9 +41,6 @@ export default function RootLayout({
             <Link href="/baten" className="hover:text-accent">
               Båten
             </Link>
-            <Link href="/booking" className="hover:text-accent">
-              Booking
-            </Link>
           </nav>
         </header>
         <main className="flex-1 max-w-5xl w-full mx-auto px-5 py-10">{children}</main>

@@ -13,7 +13,12 @@ export type ItineraryStop = {
   type: "harbor" | "anchorage" | "sail" | "handover";
   notes_no: string | null;
   position: number;
+  lat: number | null;
+  lng: number | null;
 };
+
+export const MAX_GUESTS_PER_NIGHT = 5;
+export const SKIPPER_NAME = "Skipper";
 
 export type Booking = {
   id: string;

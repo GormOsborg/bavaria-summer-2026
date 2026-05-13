@@ -1,0 +1,227 @@
+"use client";
+
+import type { Cabin } from "@/lib/types";
+import type { NightOccupancy } from "@/lib/occupancy";
+
+type Props = {
+  cabins: Cabin[];
+  selectedDates: string[];
+  occupancy: Map<string, NightOccupancy>;
+  selectedCabin: string | null;
+  onSelectCabin: (cabinId: string) => void;
+};
+
+// Geometry per cabin: polygon points on a 200x640 viewBox (bow at top).
+const CABIN_GEOMETRY: Record<string, { points: string; labelX: number; labelY: number }> = {
+  forward: {
+    points: "100,38 70,80 50,150 70,210 130,210 150,150 130,80",
+    labelX: 100,
+    labelY: 130,
+  },
+  salon: {
+    points: "45,260 155,260 155,395 45,395",
+    labelX: 100,
+    labelY: 330,
+  },
+  aft_port: {
+    points: "45,430 95,430 95,570 60,570 45,560",
+    labelX: 70,
+    labelY: 500,
+  },
+  aft_starboard: {
+    points: "105,430 155,430 155,560 140,570 105,570",
+    labelX: 130,
+    labelY: 500,
+  },
+};
+
+function stateForCabin(cabin: Cabin, selectedDates: string[], occupancy: Map<string, NightOccupancy>): "empty" | "partial" | "full" {
+  if (selectedDates.length === 0) {
+    return "empty";
+  }
+  let anyFull = false;
+  let anyFree = false;
+  for (const date of selectedDates) {
+    const occ = occupancy.get(date);
+    const info = occ?.perCabin[cabin.id];
+    if (!info) {
+      anyFree = true;
+      continue;
+    }
+    if (info.occupied >= info.max) anyFull = true;
+    else anyFree = true;
+  }
+  if (anyFull && anyFree) return "partial";
+  if (anyFull) return "full";
+  return "empty";
+}
+
+const STATE_FILL: Record<"empty" | "partial" | "full", string> = {
+  empty: "#bbf7d0",
+  partial: "#fed7aa",
+  full: "#fecaca",
+};
+
+const STATE_STROKE: Record<"empty" | "partial" | "full", string> = {
+  empty: "#16a34a",
+  partial: "#ea580c",
+  full: "#dc2626",
+};
+
+export default function BoatSvg({
+  cabins,
+  selectedDates,
+  occupancy,
+  selectedCabin,
+  onSelectCabin,
+}: Props) {
+  return (
+    <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+      <svg
+        viewBox="0 0 200 640"
+        className="max-h-[640px] w-44 sm:w-56 shrink-0"
+        role="img"
+        aria-label="Bavaria 37 sett ovenfra"
+      >
+        {/* Hull outline */}
+        <path
+          d="M 100,5
+             C 65,30 35,110 32,210
+             L 32,540
+             C 32,575 50,600 70,605
+             L 130,605
+             C 150,600 168,575 168,540
+             L 168,210
+             C 165,110 135,30 100,5
+             Z"
+          fill="#f7f3ec"
+          stroke="#11283d"
+          strokeWidth="2.5"
+        />
+        {/* Deck/cabin top outline (subtle) */}
+        <path
+          d="M 100,30
+             C 75,55 50,130 48,220
+             L 48,425
+             C 48,445 58,455 75,455
+             L 125,455
+             C 142,455 152,445 152,425
+             L 152,220
+             C 150,130 125,55 100,30
+             Z"
+          fill="none"
+          stroke="#11283d"
+          strokeOpacity="0.18"
+          strokeWidth="1"
+          strokeDasharray="3,3"
+        />
+        {/* Mast */}
+        <circle cx="100" cy="240" r="4" fill="#11283d" />
+        {/* Cabin polygons */}
+        {cabins.map((cabin) => {
+          const geo = CABIN_GEOMETRY[cabin.id];
+          if (!geo) return null;
+          const state = stateForCabin(cabin, selectedDates, occupancy);
+          const isSelected = selectedCabin === cabin.id;
+          return (
+            <g
+              key={cabin.id}
+              onClick={() => onSelectCabin(cabin.id)}
+              className="cursor-pointer"
+            >
+              <polygon
+                points={geo.points}
+                fill={STATE_FILL[state]}
+                stroke={STATE_STROKE[state]}
+                strokeWidth={isSelected ? 4 : 1.5}
+                opacity={isSelected ? 1 : 0.9}
+              />
+              <text
+                x={geo.labelX}
+                y={geo.labelY}
+                textAnchor="middle"
+                fontSize="9"
+                fill="#11283d"
+                style={{ pointerEvents: "none" }}
+              >
+                {cabin.name_no.replace("Akterlugar ", "")}
+              </text>
+            </g>
+          );
+        })}
+        {/* Cockpit hint */}
+        <rect x="60" y="495" width="80" height="60" fill="none" stroke="#11283d" strokeOpacity="0.15" strokeWidth="1" strokeDasharray="2,2" />
+        <text x="100" y="530" textAnchor="middle" fontSize="8" fill="#11283d" opacity="0.4">
+          cockpit
+        </text>
+      </svg>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-lg">Velg lugar</h3>
+        {selectedDates.length === 0 ? (
+          <p className="mt-2 text-sm text-foreground/60">
+            Klikk en eller flere etapper på kartet over, så viser denne båten
+            ledige lugarer for de nettene.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-foreground/70">
+            Belegg for de {selectedDates.length} valgte nettene. Klikk en lugar
+            for å velge den.
+          </p>
+        )}
+        <ul className="mt-4 space-y-2">
+          {cabins.map((cabin) => {
+            const state = stateForCabin(cabin, selectedDates, occupancy);
+            const isSelected = selectedCabin === cabin.id;
+            return (
+              <li key={cabin.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelectCabin(cabin.id)}
+                  className={`w-full text-left rounded-lg border px-3 py-2 transition ${
+                    isSelected
+                      ? "border-accent bg-accent text-background"
+                      : "border-foreground/10 hover:border-foreground/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-sm">{cabin.name_no}</span>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: STATE_FILL[state],
+                        color: STATE_STROKE[state],
+                      }}
+                    >
+                      {state === "empty"
+                        ? "ledig"
+                        : state === "partial"
+                          ? "delvis"
+                          : "fullt"}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-5 flex gap-3 text-xs text-foreground/70 flex-wrap">
+          <Legend color={STATE_FILL.empty} stroke={STATE_STROKE.empty} label="ledig" />
+          <Legend color={STATE_FILL.partial} stroke={STATE_STROKE.partial} label="delvis" />
+          <Legend color={STATE_FILL.full} stroke={STATE_STROKE.full} label="fullt" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Legend({ color, stroke, label }: { color: string; stroke: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block w-3 h-3 rounded-sm border"
+        style={{ backgroundColor: color, borderColor: stroke }}
+      />
+      {label}
+    </span>
+  );
+}

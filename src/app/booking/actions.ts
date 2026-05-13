@@ -1,30 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isAuthenticated, signIn, signOut } from "@/lib/auth";
 import { supabaseRead, supabaseWrite } from "@/lib/supabase";
 import { eachNight, parseISODate } from "@/lib/dates";
+import { MAX_GUESTS_PER_NIGHT, SKIPPER_NAME } from "@/lib/types";
 
 export type ActionState =
   | { ok: true; message?: string }
   | { ok: false; error: string };
 
-export async function signInAction(
-  _prev: ActionState | undefined,
-  formData: FormData,
-): Promise<ActionState> {
-  const password = String(formData.get("password") ?? "");
-  const success = await signIn(password);
-  if (!success) {
-    return { ok: false, error: "Feil passord." };
-  }
-  revalidatePath("/booking");
-  return { ok: true };
-}
-
-export async function signOutAction(): Promise<void> {
-  await signOut();
-  revalidatePath("/booking");
+function checkPassword(value: unknown): string | null {
+  const expected = process.env.TRIP_PASSWORD;
+  if (!expected) return "Server mangler TRIP_PASSWORD.";
+  if (typeof value !== "string" || value !== expected) return "Feil passord.";
+  return null;
 }
 
 function isValidISODate(value: string): boolean {
@@ -35,9 +24,8 @@ export async function createBookingAction(
   _prev: ActionState | undefined,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await isAuthenticated())) {
-    return { ok: false, error: "Du må logge inn med passord først." };
-  }
+  const pwError = checkPassword(formData.get("password"));
+  if (pwError) return { ok: false, error: pwError };
 
   const guest_name = String(formData.get("guest_name") ?? "").trim();
   const cabin_id = String(formData.get("cabin_id") ?? "").trim();
@@ -47,6 +35,8 @@ export async function createBookingAction(
   const notes = notesRaw === "" ? null : notesRaw;
 
   if (!guest_name) return { ok: false, error: "Navn må fylles inn." };
+  if (guest_name.toLowerCase() === SKIPPER_NAME.toLowerCase())
+    return { ok: false, error: "Navnet «Skipper» er reservert." };
   if (!cabin_id) return { ok: false, error: "Velg en lugar." };
   if (!isValidISODate(start_date) || !isValidISODate(end_date)) {
     return { ok: false, error: "Datoene er ikke gyldige." };
@@ -65,25 +55,45 @@ export async function createBookingAction(
     return { ok: false, error: "Fant ikke den lugaren." };
   }
 
-  const { data: overlapping, error: overlapError } = await read
+  const nights = eachNight(start_date, end_date);
+
+  const { data: cabinOverlap, error: cabinOverlapError } = await read
     .from("bookings")
     .select("id, start_date, end_date")
     .eq("cabin_id", cabin_id)
     .lte("start_date", end_date)
     .gte("end_date", start_date);
-  if (overlapError) {
-    return { ok: false, error: `Kunne ikke sjekke ledighet: ${overlapError.message}` };
+  if (cabinOverlapError) {
+    return { ok: false, error: `Kunne ikke sjekke ledighet: ${cabinOverlapError.message}` };
   }
-
-  const nights = eachNight(start_date, end_date);
   for (const night of nights) {
-    const occupied = (overlapping ?? []).filter(
+    const occupied = (cabinOverlap ?? []).filter(
       (b) => b.start_date <= night && b.end_date >= night,
     ).length;
     if (occupied + 1 > cabin.capacity_max) {
       return {
         ok: false,
         error: `Lugaren er full natt til ${night}. Velg en annen lugar eller andre datoer.`,
+      };
+    }
+  }
+
+  const { data: nightOverlap, error: nightOverlapError } = await read
+    .from("bookings")
+    .select("id, start_date, end_date, guest_name")
+    .lte("start_date", end_date)
+    .gte("end_date", start_date);
+  if (nightOverlapError) {
+    return { ok: false, error: `Kunne ikke sjekke ledighet: ${nightOverlapError.message}` };
+  }
+  for (const night of nights) {
+    const guestCount = (nightOverlap ?? []).filter(
+      (b) => b.start_date <= night && b.end_date >= night && b.guest_name !== SKIPPER_NAME,
+    ).length;
+    if (guestCount + 1 > MAX_GUESTS_PER_NIGHT) {
+      return {
+        ok: false,
+        error: `Båten er full (maks ${MAX_GUESTS_PER_NIGHT} gjester) natt til ${night}.`,
       };
     }
   }
@@ -100,20 +110,31 @@ export async function createBookingAction(
     return { ok: false, error: `Kunne ikke lagre bookingen: ${insertError.message}` };
   }
 
+  revalidatePath("/");
   revalidatePath("/booking");
   return { ok: true, message: `Booket ${cabin.name_no} for ${guest_name}.` };
 }
 
 export async function deleteBookingAction(formData: FormData): Promise<void> {
-  if (!(await isAuthenticated())) {
-    throw new Error("Ikke autorisert.");
-  }
+  const pwError = checkPassword(formData.get("password"));
+  if (pwError) throw new Error(pwError);
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("Mangler ID.");
+
+  const read = supabaseRead();
+  const { data: target } = await read
+    .from("bookings")
+    .select("guest_name")
+    .eq("id", id)
+    .single();
+  if (target?.guest_name === SKIPPER_NAME) {
+    throw new Error("Skipper-bookingen kan ikke slettes herfra.");
+  }
 
   const write = supabaseWrite();
   const { error } = await write.from("bookings").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
+  revalidatePath("/");
   revalidatePath("/booking");
 }
