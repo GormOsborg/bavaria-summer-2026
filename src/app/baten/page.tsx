@@ -13,12 +13,11 @@ const SPECS: Array<{ label: string; value: string }> = [
 ];
 
 const PACKING = [
-  "Sovepose eller laken — det er puter og dyner ombord",
+  "Sovepose eller laken",
   "Klær for både sol og kuling — Nordsjøen kan være lunefull",
   "Solbriller, solkrem, lue",
   "Et par sko du kan ha våte (gjerne lyse såler — ikke svarte striper på dekk)",
-  "Toalettmappe i mykt etui (bedre plass enn hardcase)",
-  "Eventuelle medisiner mot sjøsyke",
+  "Toalettmappe",
 ];
 
 export default async function BatenPage() {
