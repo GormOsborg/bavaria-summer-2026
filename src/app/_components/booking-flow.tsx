@@ -24,6 +24,8 @@ type Props = {
   bookings: Booking[];
 };
 
+type Range = { start: string; end: string };
+
 export default function BookingFlow({ cabins, stops, bookings }: Props) {
   const allNights = useMemo(() => stops.map((s) => s.stop_date), [stops]);
   const occupancy = useMemo(
@@ -31,46 +33,54 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
     [allNights, cabins, bookings],
   );
 
-  const [anchorDate, setAnchorDate] = useState<string | null>(null);
-  const [otherDate, setOtherDate] = useState<string | null>(null);
+  const [range, setRange] = useState<Range | null>(null);
   const [selectedCabin, setSelectedCabin] = useState<string | null>(null);
 
-  const selectedRange = useMemo(() => {
-    if (!anchorDate) return null;
-    if (!otherDate) return { start: anchorDate, end: anchorDate };
-    return anchorDate <= otherDate
-      ? { start: anchorDate, end: otherDate }
-      : { start: otherDate, end: anchorDate };
-  }, [anchorDate, otherDate]);
-
   const selectedDates = useMemo(
-    () => (selectedRange ? eachNight(selectedRange.start, selectedRange.end) : []),
-    [selectedRange],
+    () => (range ? eachNight(range.start, range.end) : []),
+    [range],
   );
   const selectedDateSet = useMemo(() => new Set(selectedDates), [selectedDates]);
 
-  function handleToggleDate(date: string) {
-    if (!anchorDate) {
-      setAnchorDate(date);
-      setOtherDate(null);
+  function extendRange(date: string) {
+    if (!range) {
+      setRange({ start: date, end: date });
       return;
     }
-    if (!otherDate) {
-      if (date === anchorDate) {
-        setAnchorDate(null);
-      } else {
-        setOtherDate(date);
-      }
+    if (date < range.start) {
+      setRange({ start: date, end: range.end });
       return;
     }
-    setAnchorDate(date);
-    setOtherDate(null);
+    if (date > range.end) {
+      setRange({ start: range.start, end: date });
+      return;
+    }
+  }
+
+  function setStart(date: string) {
+    if (!range) {
+      setRange({ start: date, end: date });
+      return;
+    }
+    setRange({ start: date, end: date > range.end ? date : range.end });
+  }
+
+  function setEnd(date: string) {
+    if (!range) {
+      setRange({ start: date, end: date });
+      return;
+    }
+    setRange({ start: date < range.start ? date : range.start, end: date });
   }
 
   function clearSelection() {
-    setAnchorDate(null);
-    setOtherDate(null);
+    setRange(null);
     setSelectedCabin(null);
+  }
+
+  function selectWholeTrip() {
+    if (allNights.length === 0) return;
+    setRange({ start: allNights[0], end: allNights[allNights.length - 1] });
   }
 
   const [state, formAction, pending] = useActionState<ActionState | undefined, FormData>(
@@ -89,7 +99,7 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
 
   return (
     <div className="flex flex-col gap-10">
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-4">
         <header className="flex items-baseline justify-between gap-4 flex-wrap">
           <h2 className="text-xl font-semibold">Velg etapper</h2>
           <div className="flex items-center gap-3 text-xs">
@@ -102,12 +112,15 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
           stops={stops}
           occupancy={occupancy}
           selectedDates={selectedDateSet}
-          onToggleDate={handleToggleDate}
+          onSelectDate={extendRange}
         />
-        <SelectionSummary
-          range={selectedRange}
-          totalNights={selectedDates.length}
+        <RangePicker
+          stops={stops}
+          range={range}
+          onSetStart={setStart}
+          onSetEnd={setEnd}
           onClear={clearSelection}
+          onSelectWholeTrip={selectWholeTrip}
         />
       </section>
 
@@ -122,23 +135,26 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
       </section>
 
       <section>
-        <form action={formAction} className="rounded-2xl border border-foreground/10 bg-background p-5 sm:p-6 flex flex-col gap-4">
+        <form
+          action={formAction}
+          className="rounded-2xl border border-foreground/10 bg-background p-5 sm:p-6 flex flex-col gap-4"
+        >
           <h2 className="text-xl font-semibold">Bekreft booking</h2>
 
           <input type="hidden" name="cabin_id" value={selectedCabin ?? ""} />
-          <input type="hidden" name="start_date" value={selectedRange?.start ?? ""} />
-          <input type="hidden" name="end_date" value={selectedRange?.end ?? ""} />
+          <input type="hidden" name="start_date" value={range?.start ?? ""} />
+          <input type="hidden" name="end_date" value={range?.end ?? ""} />
 
           <ConfirmRow
             label="Etappe"
             value={
-              selectedRange
-                ? selectedRange.start === selectedRange.end
-                  ? formatNorwegianDate(selectedRange.start)
-                  : `${formatNorwegianDate(selectedRange.start)} – ${formatNorwegianDate(selectedRange.end)}`
+              range
+                ? range.start === range.end
+                  ? formatNorwegianDate(range.start)
+                  : `${formatNorwegianDate(range.start)} – ${formatNorwegianDate(range.end)}`
                 : "ingen valgt"
             }
-            missing={!selectedRange}
+            missing={!range}
           />
           <ConfirmRow
             label="Lugar"
@@ -186,7 +202,7 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
           <div className="flex items-center gap-4 flex-wrap">
             <button
               type="submit"
-              disabled={pending || !selectedRange || !selectedCabin}
+              disabled={pending || !range || !selectedCabin}
               className="rounded-lg bg-accent text-background px-5 py-2 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {pending ? "Lagrer…" : "Bekreft booking"}
@@ -199,14 +215,14 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
             )}
           </div>
 
-          {!selectedRange && (
+          {!range && (
             <p className="text-xs text-foreground/60">
-              Klikk en etappe på kartet for å velge dato.
+              Klikk en etappe på kartet, eller velg datoer fra dropdownene.
             </p>
           )}
-          {!selectedCabin && selectedRange && (
+          {!selectedCabin && range && (
             <p className="text-xs text-foreground/60">
-              Klikk en lugar på båten for å velge soveplass.
+              Klikk en lugar på båten over for å velge soveplass.
             </p>
           )}
 
@@ -220,40 +236,84 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
   );
 }
 
-function SelectionSummary({
+function RangePicker({
+  stops,
   range,
-  totalNights,
+  onSetStart,
+  onSetEnd,
   onClear,
+  onSelectWholeTrip,
 }: {
-  range: { start: string; end: string } | null;
-  totalNights: number;
+  stops: ItineraryStop[];
+  range: Range | null;
+  onSetStart: (date: string) => void;
+  onSetEnd: (date: string) => void;
   onClear: () => void;
+  onSelectWholeTrip: () => void;
 }) {
-  if (!range) {
-    return (
-      <p className="text-sm text-foreground/60">
-        Klikk en etappe (linje eller punkt) på kartet for å velge en natt. Klikk
-        et nytt punkt for å utvide til et tidsrom.
-      </p>
-    );
-  }
+  const totalNights = range ? eachNight(range.start, range.end).length : 0;
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl bg-accent-soft px-4 py-2 text-sm">
-      <span>
-        Valgt:{" "}
-        <strong>
-          {range.start === range.end
-            ? `1 natt (${formatNorwegianDate(range.start)})`
-            : `${totalNights} netter (${formatNorwegianDate(range.start)} – ${formatNorwegianDate(range.end)})`}
-        </strong>
-      </span>
-      <button
-        type="button"
-        onClick={onClear}
-        className="text-foreground/60 underline underline-offset-2 hover:text-foreground"
-      >
-        nullstill
-      </button>
+    <div className="rounded-2xl border border-foreground/10 bg-accent-soft px-4 py-3 flex flex-col gap-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs font-medium text-foreground/80">
+          Fra
+          <select
+            value={range?.start ?? ""}
+            onChange={(e) => onSetStart(e.target.value)}
+            className="rounded-lg border border-foreground/15 bg-background px-3 py-1.5 text-sm min-w-44"
+          >
+            <option value="" disabled>
+              velg første natt
+            </option>
+            {stops.map((s) => (
+              <option key={`from-${s.id}`} value={s.stop_date}>
+                {formatNorwegianDate(s.stop_date)} – {s.location_no}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-foreground/80">
+          Til
+          <select
+            value={range?.end ?? ""}
+            onChange={(e) => onSetEnd(e.target.value)}
+            className="rounded-lg border border-foreground/15 bg-background px-3 py-1.5 text-sm min-w-44"
+          >
+            <option value="" disabled>
+              velg siste natt
+            </option>
+            {stops.map((s) => (
+              <option key={`to-${s.id}`} value={s.stop_date}>
+                {formatNorwegianDate(s.stop_date)} – {s.location_no}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={onSelectWholeTrip}
+            className="text-xs rounded-lg border border-foreground/15 bg-background px-3 py-1.5 hover:border-foreground/40"
+          >
+            Hele turen
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs rounded-lg border border-foreground/15 bg-background px-3 py-1.5 hover:border-foreground/40"
+            disabled={!range}
+          >
+            Nullstill
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-foreground/70">
+        {range
+          ? totalNights === 1
+            ? `1 natt valgt`
+            : `${totalNights} netter valgt`
+          : "Ingenting valgt enda. Klikk en etappe på kartet, eller velg fra dropdownene."}
+      </p>
     </div>
   );
 }
@@ -278,9 +338,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 function BookingList({ bookings, cabins }: { bookings: Booking[]; cabins: Cabin[] }) {
   const cabinName = useMemo(() => new Map(cabins.map((c) => [c.id, c.name_no])), [cabins]);
-  if (bookings.length === 0) {
-    return null;
-  }
+  if (bookings.length === 0) return null;
   return (
     <section>
       <h2 className="text-xl font-semibold mb-3">Alle bookinger</h2>

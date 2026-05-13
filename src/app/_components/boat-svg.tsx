@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Cabin } from "@/lib/types";
 import type { NightOccupancy } from "@/lib/occupancy";
 
@@ -11,7 +12,6 @@ type Props = {
   onSelectCabin: (cabinId: string) => void;
 };
 
-// Geometry per cabin: polygon points on a 200x640 viewBox (bow at top).
 const CABIN_GEOMETRY: Record<string, { points: string; labelX: number; labelY: number }> = {
   forward: {
     points: "100,38 70,80 50,150 70,210 130,210 150,150 130,80",
@@ -35,15 +35,37 @@ const CABIN_GEOMETRY: Record<string, { points: string; labelX: number; labelY: n
   },
 };
 
-function stateForCabin(cabin: Cabin, selectedDates: string[], occupancy: Map<string, NightOccupancy>): "empty" | "partial" | "full" {
+const CABIN_INFO: Record<string, { headline: string; body: string }> = {
+  forward: {
+    headline: "Skipperens lugar — én plass igjen",
+    body: "Skipperen er ombord hele turen og tar 1 av 2 sengeplasser her. Det er plass til én gjest til — passer godt for en partner eller noen som vil ha en stille, lukket lugar med dobbeltkøye foran.",
+  },
+  aft_port: {
+    headline: "Lukket lugar i akterskipet",
+    body: "Sengen er romslig for én, men trang for to. Passer best for et par som ikke har noe imot å ligge tett. Lugaren er litt mørkere og kjøligere enn forlugaren — bra for de som er lyssensitive.",
+  },
+  aft_starboard: {
+    headline: "Lukket lugar i akterskipet",
+    body: "Sengen er romslig for én, men trang for to. Passer best for et par som ikke har noe imot å ligge tett. Speilvendt motstykke til babord — fungerer likt.",
+  },
+  salon: {
+    headline: "Sofakøye i salongen",
+    body: "Du sover på salongsofaen midt i båten. Det er ikke en ekte seng, men en sofa — så du er litt mer eksponert for støy og morgenkaffe-stemning. Greit for en natt eller to, mer prøvende over lengre strekk.",
+  },
+};
+
+function stateForCabin(
+  cabin: Cabin,
+  selectedDates: string[],
+  occupancy: Map<string, NightOccupancy>,
+): "empty" | "partial" | "full" {
   if (selectedDates.length === 0) {
-    return "empty";
+    return cabin.id === "forward" ? "partial" : "empty";
   }
   let anyFull = false;
   let anyFree = false;
   for (const date of selectedDates) {
-    const occ = occupancy.get(date);
-    const info = occ?.perCabin[cabin.id];
+    const info = occupancy.get(date)?.perCabin[cabin.id];
     if (!info) {
       anyFree = true;
       continue;
@@ -51,6 +73,7 @@ function stateForCabin(cabin: Cabin, selectedDates: string[], occupancy: Map<str
     if (info.occupied >= info.max) anyFull = true;
     else anyFree = true;
   }
+  if (cabin.id === "forward" && !anyFull) return "partial";
   if (anyFull && anyFree) return "partial";
   if (anyFull) return "full";
   return "empty";
@@ -68,6 +91,12 @@ const STATE_STROKE: Record<"empty" | "partial" | "full", string> = {
   full: "#dc2626",
 };
 
+const STATE_LABEL: Record<"empty" | "partial" | "full", string> = {
+  empty: "ledig",
+  partial: "delvis",
+  full: "fullt",
+};
+
 export default function BoatSvg({
   cabins,
   selectedDates,
@@ -75,15 +104,18 @@ export default function BoatSvg({
   selectedCabin,
   onSelectCabin,
 }: Props) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  const infoCabinId = hovered ?? selectedCabin;
+  const info = infoCabinId ? CABIN_INFO[infoCabinId] : null;
+
   return (
-    <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+    <div className="grid lg:grid-cols-[auto_1fr_18rem] gap-6 items-start">
       <svg
         viewBox="0 0 200 640"
-        className="max-h-[640px] w-44 sm:w-56 shrink-0"
+        className="max-h-[640px] w-44 sm:w-52 shrink-0 mx-auto lg:mx-0"
         role="img"
         aria-label="Bavaria 37 sett ovenfra"
       >
-        {/* Hull outline */}
         <path
           d="M 100,5
              C 65,30 35,110 32,210
@@ -98,7 +130,6 @@ export default function BoatSvg({
           stroke="#11283d"
           strokeWidth="2.5"
         />
-        {/* Deck/cabin top outline (subtle) */}
         <path
           d="M 100,30
              C 75,55 50,130 48,220
@@ -115,26 +146,27 @@ export default function BoatSvg({
           strokeWidth="1"
           strokeDasharray="3,3"
         />
-        {/* Mast */}
         <circle cx="100" cy="240" r="4" fill="#11283d" />
-        {/* Cabin polygons */}
         {cabins.map((cabin) => {
           const geo = CABIN_GEOMETRY[cabin.id];
           if (!geo) return null;
           const state = stateForCabin(cabin, selectedDates, occupancy);
           const isSelected = selectedCabin === cabin.id;
+          const isHovered = hovered === cabin.id;
           return (
             <g
               key={cabin.id}
               onClick={() => onSelectCabin(cabin.id)}
+              onMouseEnter={() => setHovered(cabin.id)}
+              onMouseLeave={() => setHovered(null)}
               className="cursor-pointer"
             >
               <polygon
                 points={geo.points}
                 fill={STATE_FILL[state]}
                 stroke={STATE_STROKE[state]}
-                strokeWidth={isSelected ? 4 : 1.5}
-                opacity={isSelected ? 1 : 0.9}
+                strokeWidth={isSelected ? 4 : isHovered ? 2.5 : 1.5}
+                opacity={isSelected || isHovered ? 1 : 0.9}
               />
               <text
                 x={geo.labelX}
@@ -149,23 +181,40 @@ export default function BoatSvg({
             </g>
           );
         })}
-        {/* Cockpit hint */}
-        <rect x="60" y="495" width="80" height="60" fill="none" stroke="#11283d" strokeOpacity="0.15" strokeWidth="1" strokeDasharray="2,2" />
-        <text x="100" y="530" textAnchor="middle" fontSize="8" fill="#11283d" opacity="0.4">
+        <rect
+          x="60"
+          y="495"
+          width="80"
+          height="60"
+          fill="none"
+          stroke="#11283d"
+          strokeOpacity="0.15"
+          strokeWidth="1"
+          strokeDasharray="2,2"
+        />
+        <text
+          x="100"
+          y="530"
+          textAnchor="middle"
+          fontSize="8"
+          fill="#11283d"
+          opacity="0.4"
+        >
           cockpit
         </text>
       </svg>
-      <div className="flex-1 min-w-0">
+
+      <div className="min-w-0">
         <h3 className="font-semibold text-lg">Velg lugar</h3>
         {selectedDates.length === 0 ? (
           <p className="mt-2 text-sm text-foreground/60">
-            Klikk en eller flere etapper på kartet over, så viser denne båten
-            ledige lugarer for de nettene.
+            Klikk en eller flere etapper på kartet, så viser denne båten ledige
+            lugarer for de nettene.
           </p>
         ) : (
           <p className="mt-2 text-sm text-foreground/70">
             Belegg for de {selectedDates.length} valgte nettene. Klikk en lugar
-            for å velge den.
+            for å velge den. Hold musen over for å lese mer.
           </p>
         )}
         <ul className="mt-4 space-y-2">
@@ -177,14 +226,30 @@ export default function BoatSvg({
                 <button
                   type="button"
                   onClick={() => onSelectCabin(cabin.id)}
+                  onMouseEnter={() => setHovered(cabin.id)}
+                  onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(cabin.id)}
+                  onBlur={() => setHovered(null)}
                   className={`w-full text-left rounded-lg border px-3 py-2 transition ${
                     isSelected
                       ? "border-accent bg-accent text-background"
-                      : "border-foreground/10 hover:border-foreground/30"
+                      : "border-foreground/10 hover:border-foreground/40"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-sm">{cabin.name_no}</span>
+                    <span className="font-medium text-sm flex items-center gap-2">
+                      {cabin.name_no}
+                      <span
+                        className={`text-[10px] w-4 h-4 inline-flex items-center justify-center rounded-full border ${
+                          isSelected
+                            ? "border-background/40 text-background/80"
+                            : "border-foreground/30 text-foreground/50"
+                        }`}
+                        aria-hidden
+                      >
+                        ?
+                      </span>
+                    </span>
                     <span
                       className="text-xs px-2 py-0.5 rounded-full"
                       style={{
@@ -192,11 +257,7 @@ export default function BoatSvg({
                         color: STATE_STROKE[state],
                       }}
                     >
-                      {state === "empty"
-                        ? "ledig"
-                        : state === "partial"
-                          ? "delvis"
-                          : "fullt"}
+                      {STATE_LABEL[state]}
                     </span>
                   </div>
                 </button>
@@ -204,12 +265,29 @@ export default function BoatSvg({
             );
           })}
         </ul>
-        <div className="mt-5 flex gap-3 text-xs text-foreground/70 flex-wrap">
+        <div className="mt-4 flex gap-3 text-xs text-foreground/70 flex-wrap">
           <Legend color={STATE_FILL.empty} stroke={STATE_STROKE.empty} label="ledig" />
           <Legend color={STATE_FILL.partial} stroke={STATE_STROKE.partial} label="delvis" />
           <Legend color={STATE_FILL.full} stroke={STATE_STROKE.full} label="fullt" />
         </div>
       </div>
+
+      <aside
+        aria-live="polite"
+        className="rounded-xl border border-foreground/10 bg-accent-soft p-4 text-sm min-h-32"
+      >
+        {info ? (
+          <>
+            <h4 className="font-semibold">{info.headline}</h4>
+            <p className="mt-2 text-foreground/80 leading-relaxed">{info.body}</p>
+          </>
+        ) : (
+          <p className="text-foreground/60">
+            Hold musen over en lugar — eller trykk på den — for å lese hvordan
+            den er å sove i.
+          </p>
+        )}
+      </aside>
     </div>
   );
 }
