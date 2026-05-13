@@ -24,7 +24,8 @@ type Props = {
   onSelectDate: (date: string) => void;
 };
 
-const OFFSET_DEG = 0.025;
+const CURVE_OFFSET_DEG = 0.05;
+const CURVE_SAMPLES = 18;
 
 function colorForGuests(guests: number): string {
   if (guests <= 0) return "#16a34a";
@@ -34,24 +35,42 @@ function colorForGuests(guests: number): string {
 
 type LatLng = { lat: number; lng: number };
 
-function offsetLeg(
+function curveLeg(
   a: LatLng,
   b: LatLng,
   magnitude: number,
-): { a: LatLng; b: LatLng; mid: LatLng; rotation: number } {
+  samples: number,
+): { positions: Array<[number, number]>; mid: LatLng; rotation: number } {
   const dLng = b.lng - a.lng;
   const dLat = b.lat - a.lat;
   const len = Math.sqrt(dLng * dLng + dLat * dLat);
   if (len === 0) {
-    return { a, b, mid: a, rotation: 0 };
+    return { positions: [[a.lat, a.lng]], mid: a, rotation: 0 };
   }
-  const offLat = -(dLng / len) * magnitude;
-  const offLng = (dLat / len) * magnitude;
-  const oa = { lat: a.lat + offLat, lng: a.lng + offLng };
-  const ob = { lat: b.lat + offLat, lng: b.lng + offLng };
-  const mid = { lat: (oa.lat + ob.lat) / 2, lng: (oa.lng + ob.lng) / 2 };
+  const perpLat = -(dLng / len) * magnitude;
+  const perpLng = (dLat / len) * magnitude;
+  const midAB = { lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 };
+  // Bezier control point chosen so the curve at t=0.5 is offset by `magnitude` from midAB.
+  const ctrl = {
+    lat: midAB.lat + 2 * perpLat,
+    lng: midAB.lng + 2 * perpLng,
+  };
+
+  const positions: Array<[number, number]> = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const omt = 1 - t;
+    const lat = omt * omt * a.lat + 2 * omt * t * ctrl.lat + t * t * b.lat;
+    const lng = omt * omt * a.lng + 2 * omt * t * ctrl.lng + t * t * b.lng;
+    positions.push([lat, lng]);
+  }
+
+  const mid = {
+    lat: 0.25 * a.lat + 0.5 * ctrl.lat + 0.25 * b.lat,
+    lng: 0.25 * a.lng + 0.5 * ctrl.lng + 0.25 * b.lng,
+  };
   const rotation = -Math.atan2(dLat, dLng) * (180 / Math.PI);
-  return { a: oa, b: ob, mid, rotation };
+  return { positions, mid, rotation };
 }
 
 function arrowIcon(rotation: number, color: string, highlighted: boolean): L.DivIcon {
@@ -123,16 +142,13 @@ export default function RouteMap({ stops, occupancy, selectedDates, onSelectDate
           const occNext = occupancy.get(next.stop_date);
           const guests = occNext?.guestTotal ?? 0;
           const color = colorForGuests(guests);
-          const offset = offsetLeg(stop, next, OFFSET_DEG);
+          const curve = curveLeg(stop, next, CURVE_OFFSET_DEG, CURVE_SAMPLES);
           const legSelected =
             selectedDates.has(stop.stop_date) && selectedDates.has(next.stop_date);
           return (
             <Polyline
               key={`${stop.id}-${next.id}`}
-              positions={[
-                [offset.a.lat, offset.a.lng],
-                [offset.b.lat, offset.b.lng],
-              ]}
+              positions={curve.positions}
               pathOptions={{
                 color,
                 weight: legSelected ? 7 : 4,
@@ -159,14 +175,14 @@ export default function RouteMap({ stops, occupancy, selectedDates, onSelectDate
           const occNext = occupancy.get(next.stop_date);
           const guests = occNext?.guestTotal ?? 0;
           const color = colorForGuests(guests);
-          const offset = offsetLeg(stop, next, OFFSET_DEG);
+          const curve = curveLeg(stop, next, CURVE_OFFSET_DEG, CURVE_SAMPLES);
           const legSelected =
             selectedDates.has(stop.stop_date) && selectedDates.has(next.stop_date);
           return (
             <Marker
               key={`arrow-${stop.id}-${next.id}`}
-              position={[offset.mid.lat, offset.mid.lng]}
-              icon={arrowIcon(offset.rotation, color, legSelected)}
+              position={[curve.mid.lat, curve.mid.lng]}
+              icon={arrowIcon(curve.rotation, color, legSelected)}
               interactive
               eventHandlers={{
                 click: () => onSelectDate(next.stop_date),

@@ -35,25 +35,6 @@ const CABIN_GEOMETRY: Record<string, { points: string; labelX: number; labelY: n
   },
 };
 
-const CABIN_INFO: Record<string, { headline: string; body: string }> = {
-  forward: {
-    headline: "Skipperens lugar — én plass igjen",
-    body: "Skipperen er ombord hele turen og tar 1 av 2 sengeplasser her. Det er plass til én gjest til — passer godt for en partner eller noen som vil ha en stille, lukket lugar med dobbeltkøye foran.",
-  },
-  aft_port: {
-    headline: "Lukket lugar i akterskipet",
-    body: "Sengen er romslig for én, men trang for to. Passer best for et par som ikke har noe imot å ligge tett. Lugaren er litt mørkere og kjøligere enn forlugaren — bra for de som er lyssensitive.",
-  },
-  aft_starboard: {
-    headline: "Lukket lugar i akterskipet",
-    body: "Sengen er romslig for én, men trang for to. Passer best for et par som ikke har noe imot å ligge tett. Speilvendt motstykke til babord — fungerer likt.",
-  },
-  salon: {
-    headline: "Sofakøye i salongen",
-    body: "Du sover på salongsofaen midt i båten. Det er ikke en ekte seng, men en sofa — så du er litt mer eksponert for støy og morgenkaffe-stemning. Greit for en natt eller to, mer prøvende over lengre strekk.",
-  },
-};
-
 function stateForCabin(
   cabin: Cabin,
   selectedDates: string[],
@@ -106,7 +87,7 @@ export default function BoatSvg({
 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
   const infoCabinId = hovered ?? selectedCabin;
-  const info = infoCabinId ? CABIN_INFO[infoCabinId] : null;
+  const infoCabin = infoCabinId ? cabins.find((c) => c.id === infoCabinId) : null;
 
   return (
     <div className="grid lg:grid-cols-[auto_1fr_18rem] gap-6 items-start">
@@ -276,15 +257,21 @@ export default function BoatSvg({
         aria-live="polite"
         className="rounded-xl border border-foreground/10 bg-accent-soft p-4 text-sm min-h-32"
       >
-        {info ? (
+        {infoCabin ? (
           <>
-            <h4 className="font-semibold">{info.headline}</h4>
-            <p className="mt-2 text-foreground/80 leading-relaxed">{info.body}</p>
+            <h4 className="font-semibold">{infoCabin.name_no}</h4>
+            <p className="mt-2 text-foreground/80 leading-relaxed">
+              {infoCabin.description_no ?? "Ingen beskrivelse i databasen enda."}
+            </p>
+            {infoCabin.id === "forward" && (
+              <p className="mt-2 text-xs text-foreground/60">
+                Skipper okkuperer 1 av 2 plasser her hele turen.
+              </p>
+            )}
           </>
         ) : (
           <p className="text-foreground/60">
-            Hold musen over en lugar — eller trykk på den — for å lese hvordan
-            den er å sove i.
+            Hold musen over en lugar — eller trykk på den — for å lese mer.
           </p>
         )}
       </aside>
