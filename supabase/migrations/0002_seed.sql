@@ -3,8 +3,8 @@
 
 insert into public.cabins (id, name_no, capacity_max, description_no, position) values
   ('forward',       'Forlugar',        2, 'Stor dobbeltkøye foran. Behagelig for to.', 1),
-  ('aft_port',      'Akterlugar babord',   2, 'Akterlugar på babord side. Komfortabel for én, litt trang for to.', 2),
-  ('aft_starboard', 'Akterlugar styrbord', 2, 'Akterlugar på styrbord side. Komfortabel for én, litt trang for to.', 3),
+  ('aft_port',      'Akterlugar babord',   2, 'Akterlugar på babord side. Komfortabel for én. Går an å være to hvis man er et par.', 2),
+  ('aft_starboard', 'Akterlugar styrbord', 2, 'Akterlugar på styrbord side. Komfortabel for én. Går an å være to hvis man er et par.', 3),
   ('salon',         'Salongsofaen',    2, 'Sofaen i salongen kan brukes som ekstra køyeplass.', 4);
 
 -- Rough itinerary, Oksval → Lillesand → svenskekysten → Strømstad-området.

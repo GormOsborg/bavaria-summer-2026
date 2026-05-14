@@ -28,7 +28,9 @@ const CURVE_OFFSET_DEG = 0.05;
 const CURVE_SAMPLES = 18;
 
 function colorForGuests(guests: number): string {
-  if (guests <= 0) return "#16a34a";
+  // Kaptein teller som 1 plass. Slår over til "delvis" når 3 av 5 plasser
+  // (inkl. kapteinen) er booket, altså fra 2 gjester og oppover.
+  if (guests <= 1) return "#16a34a";
   if (guests >= MAX_GUESTS_PER_NIGHT) return "#dc2626";
   return "#ca8a04";
 }
