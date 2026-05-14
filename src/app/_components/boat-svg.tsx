@@ -7,6 +7,7 @@ import type { NightOccupancy } from "@/lib/occupancy";
 type Props = {
   cabins: Cabin[];
   selectedDates: string[];
+  allDates: string[];
   occupancy: Map<string, NightOccupancy>;
   selectedCabin: string | null;
   onSelectCabin: (cabinId: string) => void;
@@ -37,38 +38,41 @@ const CABIN_GEOMETRY: Record<string, { points: string; labelX: number; labelY: n
 
 function stateForCabin(
   cabin: Cabin,
-  selectedDates: string[],
+  dates: string[],
   occupancy: Map<string, NightOccupancy>,
 ): "empty" | "partial" | "full" {
-  if (selectedDates.length === 0) {
+  if (dates.length === 0) {
     return cabin.id === "forward" ? "partial" : "empty";
   }
   let anyFull = false;
   let anyFree = false;
-  for (const date of selectedDates) {
+  let anyOccupant = false;
+  for (const date of dates) {
     const info = occupancy.get(date)?.perCabin[cabin.id];
     if (!info) {
       anyFree = true;
       continue;
     }
+    if (info.occupied > 0) anyOccupant = true;
     if (info.occupied >= info.max) anyFull = true;
     else anyFree = true;
   }
   if (cabin.id === "forward" && !anyFull) return "partial";
   if (anyFull && anyFree) return "partial";
   if (anyFull) return "full";
+  if (anyOccupant) return "partial";
   return "empty";
 }
 
 const STATE_FILL: Record<"empty" | "partial" | "full", string> = {
   empty: "#bbf7d0",
-  partial: "#fed7aa",
+  partial: "#fef08a",
   full: "#fecaca",
 };
 
 const STATE_STROKE: Record<"empty" | "partial" | "full", string> = {
   empty: "#16a34a",
-  partial: "#ea580c",
+  partial: "#ca8a04",
   full: "#dc2626",
 };
 
@@ -81,6 +85,7 @@ const STATE_LABEL: Record<"empty" | "partial" | "full", string> = {
 export default function BoatSvg({
   cabins,
   selectedDates,
+  allDates,
   occupancy,
   selectedCabin,
   onSelectCabin,
@@ -88,6 +93,8 @@ export default function BoatSvg({
   const [hovered, setHovered] = useState<string | null>(null);
   const infoCabinId = hovered ?? selectedCabin;
   const infoCabin = infoCabinId ? cabins.find((c) => c.id === infoCabinId) : null;
+  const datesForState = selectedDates.length > 0 ? selectedDates : allDates;
+  const isShowingTripWide = selectedDates.length === 0;
 
   return (
     <div className="grid lg:grid-cols-[auto_1fr_18rem] gap-6 items-start">
@@ -131,7 +138,7 @@ export default function BoatSvg({
         {cabins.map((cabin) => {
           const geo = CABIN_GEOMETRY[cabin.id];
           if (!geo) return null;
-          const state = stateForCabin(cabin, selectedDates, occupancy);
+          const state = stateForCabin(cabin, datesForState, occupancy);
           const isSelected = selectedCabin === cabin.id;
           const isHovered = hovered === cabin.id;
           return (
@@ -187,10 +194,10 @@ export default function BoatSvg({
 
       <div className="min-w-0">
         <h3 className="font-semibold text-lg">Velg lugar</h3>
-        {selectedDates.length === 0 ? (
+        {isShowingTripWide ? (
           <p className="mt-2 text-sm text-foreground/60">
-            Klikk en eller flere etapper på kartet, så viser denne båten ledige
-            lugarer for de nettene.
+            Viser belegg på tvers av hele turen. Klikk en etappe på kartet for å
+            se belegget for bestemte netter.
           </p>
         ) : (
           <p className="mt-2 text-sm text-foreground/70">
@@ -200,7 +207,7 @@ export default function BoatSvg({
         )}
         <ul className="mt-4 space-y-2">
           {cabins.map((cabin) => {
-            const state = stateForCabin(cabin, selectedDates, occupancy);
+            const state = stateForCabin(cabin, datesForState, occupancy);
             const isSelected = selectedCabin === cabin.id;
             return (
               <li key={cabin.id}>

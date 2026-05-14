@@ -104,7 +104,7 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
           <h2 className="text-xl font-semibold">Velg etapper</h2>
           <div className="flex items-center gap-3 text-xs">
             <LegendDot color="#16a34a" label="ledig" />
-            <LegendDot color="#ea580c" label="delvis" />
+            <LegendDot color="#ca8a04" label="delvis" />
             <LegendDot color="#dc2626" label={`fullt (${MAX_GUESTS_PER_NIGHT})`} />
           </div>
         </header>
@@ -128,6 +128,7 @@ export default function BookingFlow({ cabins, stops, bookings }: Props) {
         <BoatSvg
           cabins={cabins}
           selectedDates={selectedDates}
+          allDates={allNights}
           occupancy={occupancy}
           selectedCabin={selectedCabin}
           onSelectCabin={setSelectedCabin}

@@ -30,7 +30,7 @@ const CURVE_SAMPLES = 18;
 function colorForGuests(guests: number): string {
   if (guests <= 0) return "#16a34a";
   if (guests >= MAX_GUESTS_PER_NIGHT) return "#dc2626";
-  return "#ea580c";
+  return "#ca8a04";
 }
 
 type LatLng = { lat: number; lng: number };
